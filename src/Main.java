@@ -1,40 +1,39 @@
 //TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
-import java.util.Locale;
 import java.util.Scanner;
-import java.util.Random;
-import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 void main() {
-    ArrayList<LinkShort> linkData = new ArrayList<>();
-    linkData.add(new LinkShort("https://rutube.ru","123456789",10));
-    linkData.add(new LinkShort("https://ru.wikipedia.org", "987654321", 11));
-    for (LinkShort linkShort: linkData){
-        System.out.println("Код: " + linkShort.getUrlShort());
-        System.out.println("URL: " + linkShort.getUrlOriginal());
-        System.out.println("Лимит: " + linkShort.getUseMax());
-        System.out.println("Переходов: " + linkShort.getUseCount());
+    HashMap<String, LinkShort> linkData = new HashMap<>();
+    LinkShort link1 = new LinkShort("https://rutube.ru",10);
+    LinkShort link2 = new LinkShort("https://",11);
+    linkData.put("123456789", link1);
+    linkData.put("123456790", link2);
+    for (Map.Entry<String, LinkShort> entry : linkData.entrySet()) {
+        String shortCode = entry.getKey();
+        LinkShort links = entry.getValue();
+        System.out.println("Код: " + shortCode);
+        System.out.println("URL: " + links.getUrlOriginal());
     }
     String inputUrlShort="";
     Scanner inputUrl = new Scanner(System.in);
     do{
-        boolean found = false;
         System.out.println("Введите короткий код (S для выхода)");
         inputUrlShort = inputUrl.next();
 
         if (inputUrlShort.equalsIgnoreCase("S")) {
             System.out.println("Завершение программы");
 
-        }else
-        for (LinkShort linkShort : linkData) {
-            if (inputUrlShort.equals(linkShort.getUrlShort())) {
-                linkShort.useLink();
-                found = true;
-                break;
+        }else{
+            LinkShort link = linkData.get(inputUrlShort);
+
+            if (link != null) {
+                link.useLink();
+                link.genLinkShort();
+            } else {
+                System.out.println("Ссылка не существует");
             }
-        }
-        if (!found) {
-            System.out.println("Ссылка не существует");
         }
     }while (!inputUrlShort.equalsIgnoreCase("S"));
 }
