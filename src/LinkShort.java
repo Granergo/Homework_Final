@@ -4,6 +4,7 @@ public class LinkShort {
     private String urlOriginal;
     private int useCount;
     private int useMax;
+
     public LinkShort(String urlOriginal, int useMax){
         this.urlOriginal = urlOriginal;
         this.useCount = 0;
@@ -30,14 +31,15 @@ public class LinkShort {
             System.out.println("Лимит исчерпан");
         }
     }
+    SecureRandom random = new SecureRandom();
     public String genLinkShort(){
-        SecureRandom random = new SecureRandom();
         String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
         StringBuilder urlShort = new StringBuilder(8);
         for (int i = 0;i<8;i++){
             int index = random.nextInt(alphabet.length());
             char symbol = alphabet.charAt(index);
             urlShort.append(symbol);
+
         }
         System.out.println(urlShort.toString());
         return urlShort.toString();
