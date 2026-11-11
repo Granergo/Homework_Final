@@ -12,12 +12,6 @@ public class User {
     public UUID getId() {
         return id;
     }
-
-    public static User createUser(HashMap<UUID, User> users) {
-        User newUser = new User();
-
-        users.put(newUser.getId(), newUser);
-
-        return newUser;
-    }
 }
+
+

@@ -8,9 +8,7 @@ import java.util.Map;
 void main(){
         HashMap<UUID, User> users = new HashMap<>();
         HashMap<String, LinkShort> linkData = new HashMap<>();
-
         User currentUser = null;
-
         Scanner input = new Scanner(System.in);
 
         while (true){
@@ -72,7 +70,7 @@ void main(){
 
                         if (userChoice.equals("1")) {
 
-                            currentUser = User.createUser(users);
+                           // currentUser = User.createUser(users);
 
                             System.out.println("\nПользователь успешно создан!");
                             System.out.println("UUID: " + currentUser.getId());
