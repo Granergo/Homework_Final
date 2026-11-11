@@ -1,3 +1,5 @@
+package com.linkshortener.model;
+
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.UUID;
