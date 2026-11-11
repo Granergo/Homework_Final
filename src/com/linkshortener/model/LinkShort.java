@@ -1,34 +1,46 @@
 package com.linkshortener.model;
 
-import java.security.SecureRandom;
-import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 public class LinkShort {
-    private String urlOriginal;
+
+    private final String urlOriginal;
+    private final UUID ownerId;
+    private final Instant createdAt;
+    private final Instant expiresAt;
+
     private int useCount;
     private int useMax;
 
-    private final UUID ownerId;
-    private final LocalDateTime createdAt;
-    private LocalDateTime expiresAt;
+    public LinkShort(
+            String urlOriginal,
+            int useMax,
+            UUID ownerId,
+            Duration ttl,
+            Instant createdAt
+    ) {
+        if (urlOriginal == null || urlOriginal.isBlank()) {
+            throw new IllegalArgumentException("URL не может быть пустым.");
+        }
 
-    public LinkShort(String urlOriginal, int useMax, UUID ownerId) {
+        if (useMax <= 0) {
+            throw new IllegalArgumentException("Лимит переходов должен быть положительным.");
+        }
+
+        if (ttl == null || ttl.isZero() || ttl.isNegative()) {
+            throw new IllegalArgumentException("TTL должен быть положительным.");
+        }
+
         this.urlOriginal = urlOriginal;
-        this.useCount = 0;
         this.useMax = useMax;
+        this.useCount = 0;
 
-        this.ownerId = ownerId;
-        this.createdAt = LocalDateTime.now();
-        this.expiresAt = createdAt.plusHours(24);
-    }
-
-    public int getUseCount() {
-        return useCount;
-    }
-
-    public int getUseMax() {
-        return useMax;
+        this.ownerId = Objects.requireNonNull(ownerId);
+        this.createdAt = Objects.requireNonNull(createdAt);
+        this.expiresAt = createdAt.plus(ttl);
     }
 
     public String getUrlOriginal() {
@@ -39,45 +51,51 @@ public class LinkShort {
         return ownerId;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public LocalDateTime getExpiresAt() {
+    public Instant getExpiresAt() {
         return expiresAt;
     }
 
-    public boolean isExpired() {
-        return LocalDateTime.now().isAfter(expiresAt);
+    public int getUseCount() {
+        return useCount;
+    }
+
+    public int getUseMax() {
+        return useMax;
+    }
+
+    public boolean isExpired(Instant now) {
+        return !now.isBefore(expiresAt);
+    }
+
+    public boolean hasReachedLimit() {
+        return useCount >= useMax;
+    }
+
+    public boolean registerUse(Instant now) {
+        if (isExpired(now) || hasReachedLimit()) {
+            return false;
+        }
+
+        useCount++;
+        return true;
     }
 
     public void setUseMax(int newMax) {
-        if (newMax > 0) {
-            useMax = newMax;
+        if (newMax <= 0) {
+            throw new IllegalArgumentException("Лимит должен быть положительным.");
         }
-    }
 
-    public void useLink() {
-        if (isExpired()) {
-            System.out.println("Срок действия ссылки истёк.");
-        } else if (useCount < useMax) {
-            useCount++;
-            System.out.println("Успешный переход");
-        } else {
-            System.out.println("Лимит исчерпан");
+        if (newMax < useCount) {
+            throw new IllegalArgumentException(
+                    "Новый лимит не может быть меньше уже совершённых переходов."
+            );
         }
-    }
-    SecureRandom random = new SecureRandom();
-    public String genLinkShort(){
-        String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        StringBuilder urlShort = new StringBuilder(8);
-        for (int i = 0;i<8;i++){
-            int index = random.nextInt(alphabet.length());
-            char symbol = alphabet.charAt(index);
-            urlShort.append(symbol);
 
-        }
-        System.out.println(urlShort.toString());
-        return urlShort.toString();
+        this.useMax = newMax;
     }
 }
+
