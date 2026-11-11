@@ -1,5 +1,6 @@
 
 import java.util.UUID;
+import java.util.HashMap;
 
 public class User {
     private final UUID id;
@@ -10,5 +11,13 @@ public class User {
 
     public UUID getId() {
         return id;
+    }
+
+    public static User createUser(HashMap<UUID, User> users) {
+        User newUser = new User();
+
+        users.put(newUser.getId(), newUser);
+
+        return newUser;
     }
 }

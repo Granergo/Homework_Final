@@ -72,11 +72,7 @@ void main(){
 
                         if (userChoice.equals("1")) {
 
-                            User newUser = new User();
-
-                            users.put(newUser.getId(), newUser);
-
-                            currentUser = newUser;
+                            currentUser = User.createUser(users);
 
                             System.out.println("\nПользователь успешно создан!");
                             System.out.println("UUID: " + currentUser.getId());
