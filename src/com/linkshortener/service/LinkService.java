@@ -13,6 +13,8 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.io.IOException;
+import java.time.Instant;
 
 public class LinkService {
 
@@ -22,9 +24,11 @@ public class LinkService {
     private final UserRepository userRepository;
     private final ShortCodeGenerator codeGenerator;
 
+
     private final Duration ttl;
     private final int maxAllowedClicks;
     private final Clock clock;
+    private final BrowserOpener browserOpener;
 
     public LinkService(
             LinkRepository linkRepository,
@@ -32,11 +36,13 @@ public class LinkService {
             ShortCodeGenerator codeGenerator,
             Duration ttl,
             int maxAllowedClicks,
-            Clock clock
+            Clock clock,
+            BrowserOpener browserOpener
     ) {
         this.linkRepository = Objects.requireNonNull(linkRepository);
         this.userRepository = Objects.requireNonNull(userRepository);
         this.codeGenerator = Objects.requireNonNull(codeGenerator);
+        this.browserOpener = Objects.requireNonNull(browserOpener);
 
         if (ttl == null || ttl.isZero() || ttl.isNegative()) {
             throw new IllegalArgumentException("TTL должен быть положительным.");
@@ -51,9 +57,68 @@ public class LinkService {
         this.clock = Objects.requireNonNull(clock);
     }
 
+    public LinkVisitResult visitLink(String code)
+            throws IOException, URISyntaxException {
+
+        if (code == null || code.isBlank()) {
+            return LinkVisitResult.NOT_FOUND;
+        }
+
+        LinkShort link = linkRepository.findByCode(code)
+                .orElse(null);
+
+        if (link == null) {
+            return LinkVisitResult.NOT_FOUND;
+        }
+
+        // Проверяем срок действия
+        Instant now = clock.instant();
+
+        if (link.isExpired(now)) {
+
+            linkRepository.deleteByCode(code);
+
+            return LinkVisitResult.EXPIRED;
+        }
+
+        // Резервируем один переход
+        if (!link.reserveUse(now)) {
+
+            // Повторно проверяем TTL на случай изменения времени
+            if (link.isExpired(clock.instant())) {
+
+                linkRepository.deleteByCode(code);
+
+                return LinkVisitResult.EXPIRED;
+            }
+
+            return LinkVisitResult.LIMIT_REACHED;
+        }
+
+        // Пытаемся открыть браузер
+        try {
+
+            browserOpener.open(link.getUrlOriginal());
+
+        } catch (IOException | URISyntaxException | RuntimeException e) {
+
+            // Если браузер не открылся, отменяем учёт перехода
+            link.rollbackUse();
+
+            linkRepository.save(code, link);
+
+            throw e;
+        }
+
+        // Сохраняем успешный переход
+        linkRepository.save(code, link);
+
+        return LinkVisitResult.OPENED;
+    }
+
     public String createLink(String url, int useMax, UUID ownerId) {
 
-        if (userRepository.findById(ownerId).isEmpty()) {
+        if (ownerId == null || userRepository.findById(ownerId).isEmpty()) {
             throw new IllegalArgumentException("Пользователь не найден.");
         }
 

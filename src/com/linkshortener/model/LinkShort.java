@@ -11,7 +11,6 @@ public class LinkShort {
     private final UUID ownerId;
     private final Instant createdAt;
     private final Instant expiresAt;
-
     private int useCount;
     private int useMax;
 
@@ -75,14 +74,25 @@ public class LinkShort {
         return useCount >= useMax;
     }
 
-    public boolean registerUse(Instant now) {
-        if (isExpired(now) || hasReachedLimit()) {
+
+    public synchronized boolean reserveUse(Instant now) {
+
+        if (isExpired(now) || useCount >= useMax) {
             return false;
         }
 
         useCount++;
+
         return true;
     }
+
+    public synchronized void rollbackUse() {
+
+        if (useCount > 0) {
+            useCount--;
+        }
+    }
+
 
     public void setUseMax(int newMax) {
         if (newMax <= 0) {

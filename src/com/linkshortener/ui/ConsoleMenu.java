@@ -3,7 +3,10 @@ package com.linkshortener.ui;
 import com.linkshortener.model.User;
 import com.linkshortener.service.UserService;
 import com.linkshortener.service.LinkService;
+import com.linkshortener.service.LinkVisitResult;
 
+import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Scanner;
 
@@ -148,26 +151,131 @@ public class ConsoleMenu {
         }
     }
 
+
     private void createLinkMenu() {
 
-        // UUID создаётся автоматически при первом запросе
-        // на создание короткой ссылки.
-
+        // Автоматическое создание пользователя при необходимости
         if (currentUser == null) {
 
             currentUser = userService.createUser();
 
-            System.out.println("Для вас создан новый пользователь.");
+            System.out.println("\nДля вас создан новый пользователь.");
             System.out.println("UUID: " + currentUser.getId());
         }
 
-        System.out.println("Функция создания ссылки пока не реализована.");
+        System.out.println("\n========== СОЗДАНИЕ ССЫЛКИ ==========");
+        System.out.println("Введите исходный URL.");
+        System.out.println("Для отмены введите 0.");
+        System.out.print("URL: ");
+
+        String url = input.nextLine().trim();
+
+        if (url.equals("0")) {
+            System.out.println("Создание ссылки отменено.");
+            return;
+        }
+
+        // Ввод максимального количества переходов
+        int useMax;
+
+        while (true) {
+
+            System.out.print("Максимальное количество переходов (0 - отмена): ");
+
+            String limitInput = input.nextLine().trim();
+
+            if (limitInput.equals("0")) {
+                System.out.println("Создание ссылки отменено.");
+                return;
+            }
+
+            try {
+                useMax = Integer.parseInt(limitInput);
+
+                if (useMax <= 0) {
+                    System.out.println("Лимит должен быть положительным числом.");
+                    continue;
+                }
+
+                break;
+
+            } catch (NumberFormatException e) {
+                System.out.println("Введите целое положительное число.");
+            }
+        }
+
+        // Создание ссылки через сервис
+        try {
+
+            String shortCode = linkService.createLink(
+                    url,
+                    useMax,
+                    currentUser.getId()
+            );
+
+            System.out.println("\nСсылка успешно создана!");
+            System.out.println("Исходный URL: " + url);
+            System.out.println("Короткий код: " + shortCode);
+            System.out.println("Лимит переходов: " + useMax);
+
+        } catch (IllegalArgumentException | IllegalStateException e) {
+
+            System.out.println("\nНе удалось создать ссылку.");
+            System.out.println("Причина: " + e.getMessage());
+        }
     }
+
+
 
     private void openLinkMenu() {
 
-        System.out.println("Функция перехода пока не реализована.");
+        System.out.println("\n========== ПЕРЕХОД ПО ССЫЛКЕ ==========");
+        System.out.println("Введите короткий код.");
+        System.out.println("Для отмены введите 0.");
+        System.out.print("Короткий код: ");
+
+        String code = input.nextLine().trim();
+
+        if (code.equals("0")) {
+            System.out.println("Переход отменён.");
+            return;
+        }
+
+        try {
+
+            LinkVisitResult result = linkService.visitLink(code);
+
+            switch (result) {
+
+                case OPENED:
+                    System.out.println("\nБраузер успешно вызван.");
+                    System.out.println("Переход учтён.");
+                    break;
+
+                case NOT_FOUND:
+                    System.out.println("\nКороткая ссылка не найдена.");
+                    break;
+
+                case EXPIRED:
+                    System.out.println("\nСрок действия ссылки истёк.");
+                    System.out.println("Ссылка автоматически удалена.");
+                    break;
+
+                case LIMIT_REACHED:
+                    System.out.println("\nЛимит переходов исчерпан.");
+                    System.out.println("Использование ссылки заблокировано.");
+                    break;
+            }
+
+        } catch (IOException | URISyntaxException |
+                 UnsupportedOperationException | SecurityException e) {
+
+            System.out.println("\nНе удалось открыть исходную ссылку.");
+            System.out.println("Причина: " + e.getMessage());
+            System.out.println("Переход не засчитан.");
+        }
     }
+
 
     private void manageLinksMenu() {
 

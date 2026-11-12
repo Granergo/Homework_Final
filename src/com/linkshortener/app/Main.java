@@ -9,6 +9,7 @@ import com.linkshortener.service.UserService;
 import com.linkshortener.service.LinkService;
 import com.linkshortener.service.ShortCodeGenerator;
 import com.linkshortener.ui.ConsoleMenu;
+import com.linkshortener.browser.DesktopBrowserOpener;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -24,14 +25,17 @@ public class Main {
         // Создание сервисов
         UserService userService = new UserService(userRepository);
 
+
         LinkService linkService = new LinkService(
                 linkRepository,
                 userRepository,
                 new ShortCodeGenerator(8),
                 Duration.ofHours(24),
                 1000,
-                Clock.systemUTC()
+                Clock.systemUTC(),
+                new DesktopBrowserOpener()
         );
+
 
         // Запуск консольного меню
         ConsoleMenu menu = new ConsoleMenu(userService, linkService);
