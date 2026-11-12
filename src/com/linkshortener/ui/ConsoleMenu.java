@@ -4,17 +4,27 @@ import com.linkshortener.model.User;
 import com.linkshortener.service.UserService;
 import com.linkshortener.service.LinkService;
 import com.linkshortener.service.LinkVisitResult;
+import com.linkshortener.model.LinkShort;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Scanner;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 
 public class ConsoleMenu {
 
     private final UserService userService;
     private final LinkService linkService;
-
+    private static final DateTimeFormatter DATE_FORMAT =
+            DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+                    .withZone(ZoneId.systemDefault());
     private final Scanner input = new Scanner(System.in);
 
     private User currentUser = null;
@@ -276,6 +286,198 @@ public class ConsoleMenu {
         }
     }
 
+    private List<Map.Entry<String, LinkShort>> getCurrentUserLinks() {
+
+        List<Map.Entry<String, LinkShort>> links = new ArrayList<>(
+                linkService.getLinksByOwner(currentUser.getId()).entrySet()
+        );
+
+        // Сортируем по короткому коду для стабильного отображения
+        links.sort((first, second) ->
+                first.getKey().compareTo(second.getKey())
+        );
+
+        return links;
+    }
+
+    private void showMyLinks() {
+
+        List<Map.Entry<String, LinkShort>> links = getCurrentUserLinks();
+
+        if (links.isEmpty()) {
+            System.out.println("\nУ вас пока нет коротких ссылок.");
+            return;
+        }
+
+        System.out.println("\n========== МОИ ССЫЛКИ ==========");
+
+        Instant now = Instant.now();
+
+        for (int i = 0; i < links.size(); i++) {
+
+            Map.Entry<String, LinkShort> entry = links.get(i);
+            LinkShort link = entry.getValue();
+
+            String status;
+
+            if (link.isExpired(now)) {
+                status = "Срок действия истёк";
+            } else if (link.hasReachedLimit()) {
+                status = "Лимит исчерпан";
+            } else {
+                status = "Активна";
+            }
+
+            System.out.println("\n" + (i + 1) + ". Короткий код: " + entry.getKey());
+            System.out.println("   Исходный URL: " + link.getUrlOriginal());
+            System.out.println("   Переходы: " + link.getUseCount()
+                    + " / " + link.getUseMax());
+            System.out.println("   Статус: " + status);
+            System.out.println("   Создана: " + DATE_FORMAT.format(link.getCreatedAt()));
+            System.out.println("   Истекает: " + DATE_FORMAT.format(link.getExpiresAt()));
+        }
+
+        System.out.println("\n================================");
+    }
+
+    private String selectMyLinkCode() {
+
+        List<Map.Entry<String, LinkShort>> links = getCurrentUserLinks();
+
+        if (links.isEmpty()) {
+            System.out.println("\nУ вас пока нет коротких ссылок.");
+            return null;
+        }
+
+        System.out.println("\nВыберите ссылку:");
+
+        for (int i = 0; i < links.size(); i++) {
+
+            Map.Entry<String, LinkShort> entry = links.get(i);
+
+            System.out.println((i + 1) + ". "
+                    + entry.getKey()
+                    + " | "
+                    + entry.getValue().getUrlOriginal());
+        }
+
+        System.out.println("\n0. Назад");
+
+        while (true) {
+
+            System.out.print("Ваш выбор: ");
+
+            String choice = input.nextLine().trim();
+
+            if (choice.equals("0")) {
+                return null;
+            }
+
+            try {
+
+                int selectedNumber = Integer.parseInt(choice);
+                int selectedIndex = selectedNumber - 1;
+
+                if (selectedIndex >= 0 && selectedIndex < links.size()) {
+                    return links.get(selectedIndex).getKey();
+                }
+
+                System.out.println("Такого номера нет.");
+
+            } catch (NumberFormatException e) {
+                System.out.println("Введите корректный номер.");
+            }
+        }
+    }
+
+    private void changeLinkLimit() {
+
+        String code = selectMyLinkCode();
+
+        if (code == null) {
+            return;
+        }
+
+        System.out.println("\nТекущий лимит: "
+                + linkService.findByCode(code).orElseThrow().getUseMax());
+
+        System.out.println("Введите новый лимит (0 - отмена):");
+
+        String limitInput = input.nextLine().trim();
+
+        if (limitInput.equals("0")) {
+            System.out.println("Изменение отменено.");
+            return;
+        }
+
+        int newMax;
+
+        try {
+            newMax = Integer.parseInt(limitInput);
+
+        } catch (NumberFormatException e) {
+            System.out.println("Введите целое число.");
+            return;
+        }
+
+        try {
+
+            linkService.updateUseMax(
+                    code,
+                    currentUser.getId(),
+                    newMax
+            );
+
+            System.out.println("\nЛимит успешно изменён!");
+
+        } catch (IllegalArgumentException e) {
+
+            System.out.println("\nНе удалось изменить лимит.");
+            System.out.println("Причина: " + e.getMessage());
+
+        } catch (SecurityException | NoSuchElementException e) {
+
+            System.out.println("\nОперация запрещена.");
+            System.out.println("Причина: " + e.getMessage());
+        }
+    }
+
+    private void deleteMyLink() {
+
+        String code = selectMyLinkCode();
+
+        if (code == null) {
+            return;
+        }
+
+        System.out.println("\nВы действительно хотите удалить ссылку "
+                + code + "?");
+        System.out.println("Введите ДА для подтверждения или 0 для отмены.");
+
+        String confirmation = input.nextLine().trim();
+
+        if (!confirmation.equalsIgnoreCase("да")) {
+            System.out.println("Удаление отменено.");
+            return;
+        }
+
+        try {
+
+            linkService.deleteLink(
+                    code,
+                    currentUser.getId()
+            );
+
+            System.out.println("\nСсылка успешно удалена!");
+
+        } catch (SecurityException | NoSuchElementException e) {
+
+            System.out.println("\nНе удалось удалить ссылку.");
+            System.out.println("Причина: " + e.getMessage());
+        }
+    }
+
+
 
     private void manageLinksMenu() {
 
@@ -284,8 +486,40 @@ public class ConsoleMenu {
             return;
         }
 
-        System.out.println("Управление ссылками пока не реализовано.");
+        while (true) {
+
+            System.out.println("\n========== МОИ ССЫЛКИ ==========");
+            System.out.println("1. Просмотреть мои ссылки");
+            System.out.println("2. Изменить лимит переходов");
+            System.out.println("3. Удалить ссылку\n");
+            System.out.println("0. Назад");
+            System.out.println("================================");
+
+            String command = input.nextLine().trim();
+
+            switch (command) {
+
+                case "1":
+                    showMyLinks();
+                    break;
+
+                case "2":
+                    changeLinkLimit();
+                    break;
+
+                case "3":
+                    deleteMyLink();
+                    break;
+
+                case "0":
+                    return;
+
+                default:
+                    System.out.println("Неизвестная команда.");
+            }
+        }
     }
+
 
     private void showHelp() {
 
