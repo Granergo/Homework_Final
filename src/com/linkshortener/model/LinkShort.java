@@ -11,9 +11,11 @@ public class LinkShort {
     private final UUID ownerId;
     private final Instant createdAt;
     private final Instant expiresAt;
+
     private int useCount;
     private int useMax;
 
+    // Создание новой ссылки
     public LinkShort(
             String urlOriginal,
             int useMax,
@@ -22,15 +24,21 @@ public class LinkShort {
             Instant createdAt
     ) {
         if (urlOriginal == null || urlOriginal.isBlank()) {
-            throw new IllegalArgumentException("URL не может быть пустым.");
+            throw new IllegalArgumentException(
+                    "URL не может быть пустым."
+            );
         }
 
         if (useMax <= 0) {
-            throw new IllegalArgumentException("Лимит переходов должен быть положительным.");
+            throw new IllegalArgumentException(
+                    "Лимит переходов должен быть положительным."
+            );
         }
 
         if (ttl == null || ttl.isZero() || ttl.isNegative()) {
-            throw new IllegalArgumentException("TTL должен быть положительным.");
+            throw new IllegalArgumentException(
+                    "TTL должен быть положительным."
+            );
         }
 
         this.urlOriginal = urlOriginal;
@@ -40,6 +48,48 @@ public class LinkShort {
         this.ownerId = Objects.requireNonNull(ownerId);
         this.createdAt = Objects.requireNonNull(createdAt);
         this.expiresAt = createdAt.plus(ttl);
+    }
+
+    // Восстановление существующей ссылки из JSON
+    public LinkShort(
+            String urlOriginal,
+            UUID ownerId,
+            Instant createdAt,
+            Instant expiresAt,
+            int useCount,
+            int useMax
+    ) {
+        if (urlOriginal == null || urlOriginal.isBlank()) {
+            throw new IllegalArgumentException(
+                    "URL не может быть пустым."
+            );
+        }
+
+        this.urlOriginal = urlOriginal;
+        this.ownerId = Objects.requireNonNull(ownerId);
+        this.createdAt = Objects.requireNonNull(createdAt);
+        this.expiresAt = Objects.requireNonNull(expiresAt);
+
+        if (!expiresAt.isAfter(createdAt)) {
+            throw new IllegalArgumentException(
+                    "Дата истечения должна быть позже даты создания."
+            );
+        }
+
+        if (useMax <= 0) {
+            throw new IllegalArgumentException(
+                    "Лимит переходов должен быть положительным."
+            );
+        }
+
+        if (useCount < 0 || useCount > useMax) {
+            throw new IllegalArgumentException(
+                    "Некорректное количество переходов."
+            );
+        }
+
+        this.useCount = useCount;
+        this.useMax = useMax;
     }
 
     public String getUrlOriginal() {
@@ -74,10 +124,9 @@ public class LinkShort {
         return useCount >= useMax;
     }
 
-
     public synchronized boolean reserveUse(Instant now) {
 
-        if (isExpired(now) || useCount >= useMax) {
+        if (isExpired(now) || hasReachedLimit()) {
             return false;
         }
 
@@ -93,10 +142,12 @@ public class LinkShort {
         }
     }
 
-
     public void setUseMax(int newMax) {
+
         if (newMax <= 0) {
-            throw new IllegalArgumentException("Лимит должен быть положительным.");
+            throw new IllegalArgumentException(
+                    "Лимит должен быть положительным."
+            );
         }
 
         if (newMax < useCount) {
@@ -108,4 +159,3 @@ public class LinkShort {
         this.useMax = newMax;
     }
 }
-

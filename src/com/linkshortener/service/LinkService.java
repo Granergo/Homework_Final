@@ -1,5 +1,6 @@
 package com.linkshortener.service;
 
+
 import com.linkshortener.model.LinkShort;
 import com.linkshortener.notification.NotificationEvent;
 import com.linkshortener.notification.NotificationService;
@@ -49,7 +50,9 @@ public class LinkService {
         this.notificationService = Objects.requireNonNull(notificationService);
 
         if (ttl == null || ttl.isZero() || ttl.isNegative()) {
-            throw new IllegalArgumentException("TTL должен быть положительным.");
+            throw new IllegalArgumentException(
+                    "TTL должен быть положительным."
+            );
         }
 
         if (maxAllowedClicks <= 0) {

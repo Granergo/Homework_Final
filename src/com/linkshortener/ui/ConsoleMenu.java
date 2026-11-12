@@ -1,10 +1,9 @@
 package com.linkshortener.ui;
-
+import com.linkshortener.model.LinkShort;
 import com.linkshortener.model.User;
 import com.linkshortener.service.UserService;
 import com.linkshortener.service.LinkService;
 import com.linkshortener.service.LinkVisitResult;
-import com.linkshortener.model.LinkShort;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -14,7 +13,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 

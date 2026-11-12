@@ -1,5 +1,4 @@
 package com.linkshortener.repository;
-
 import com.linkshortener.model.LinkShort;
 
 import java.time.Instant;
