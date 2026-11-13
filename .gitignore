@@ -1,0 +1,12 @@
+# Maven build
+/target/
+
+# Application data
+/data/
+
+# Temporary files
+*.tmp
+
+# IntelliJ IDEA
+.idea/
+*.iml
