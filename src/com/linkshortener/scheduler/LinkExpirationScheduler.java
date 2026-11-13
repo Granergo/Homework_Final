@@ -1,3 +1,4 @@
+
 package com.linkshortener.scheduler;
 
 import com.linkshortener.notification.NotificationEvent;
@@ -11,13 +12,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class LinkExpirationScheduler implements AutoCloseable {
+public final class LinkExpirationScheduler implements AutoCloseable {
 
     private final LinkService linkService;
     private final NotificationService notificationService;
-    private final Duration cleanupInterval;
+    private final long intervalMillis;
 
     private final ScheduledExecutorService scheduler;
+
+    private boolean started;
+    private boolean closed;
 
     public LinkExpirationScheduler(
             LinkService linkService,
@@ -35,21 +39,54 @@ public class LinkExpirationScheduler implements AutoCloseable {
             );
         }
 
-        this.cleanupInterval = cleanupInterval;
+        try {
+            this.intervalMillis = cleanupInterval.toMillis();
+
+        } catch (ArithmeticException e) {
+            throw new IllegalArgumentException(
+                    "Интервал очистки слишком велик.",
+                    e
+            );
+        }
+
+        if (intervalMillis <= 0) {
+            throw new IllegalArgumentException(
+                    "Интервал очистки должен составлять не менее 1 мс."
+            );
+        }
 
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread thread = new Thread(r, "link-expiration-scheduler");
+            Thread thread = new Thread(
+                    r,
+                    "link-expiration-scheduler"
+            );
+
             thread.setDaemon(true);
+
             return thread;
         });
     }
 
-    public void start() {
+    public synchronized void start() {
+
+        if (closed) {
+            throw new IllegalStateException(
+                    "Планировщик уже завершён."
+            );
+        }
+
+        if (started) {
+            throw new IllegalStateException(
+                    "Планировщик уже запущен."
+            );
+        }
+
+        started = true;
 
         scheduler.scheduleWithFixedDelay(
                 this::cleanupExpiredLinks,
-                cleanupInterval.toMillis(),
-                cleanupInterval.toMillis(),
+                intervalMillis,
+                intervalMillis,
                 TimeUnit.MILLISECONDS
         );
     }
@@ -57,7 +94,6 @@ public class LinkExpirationScheduler implements AutoCloseable {
     private void cleanupExpiredLinks() {
 
         try {
-
             linkService.cleanupExpiredLinks();
 
         } catch (RuntimeException e) {
@@ -75,7 +111,14 @@ public class LinkExpirationScheduler implements AutoCloseable {
     @Override
     public void close() {
 
-        scheduler.shutdown();
+        synchronized (this) {
+            if (closed) {
+                return;
+            }
+
+            closed = true;
+            scheduler.shutdown();
+        }
 
         try {
 
