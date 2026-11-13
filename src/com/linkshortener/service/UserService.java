@@ -6,14 +6,17 @@ import com.linkshortener.repository.UserRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-
+import java.util.Objects;
 
 public class UserService {
 
     private final UserRepository userRepository;
 
     public UserService(UserRepository userRepository) {
-        this.userRepository = userRepository;
+        this.userRepository = Objects.requireNonNull(
+                userRepository,
+                "UserRepository не может быть null."
+        );
     }
 
     public User createUser() {
