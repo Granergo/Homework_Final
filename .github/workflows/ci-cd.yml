@@ -1,26 +1,31 @@
+
 name: Link Shortener CI/CD
 
-# События, запускающие workflow
 on:
   push:
+    branches:
+      - '**'
+    tags:
+      - 'v*'
+
   pull_request:
+
   workflow_dispatch:
 
-# Минимальные права для чтения репозитория
 permissions:
   contents: read
 
 jobs:
   build-and-test:
-    name: Build, test and upload artifact
+    name: Build, test and package
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Получаем исходный код репозитория
+      # Получаем исходный код
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      # 2. Устанавливаем Java 17 и включаем кэш Maven
+      # Устанавливаем Java 17 и кэшируем Maven
       - name: Set up Java 17
         uses: actions/setup-java@v6
         with:
@@ -28,15 +33,15 @@ jobs:
           java-version: '17'
           cache: maven
 
-      # 3. Разрешаем запуск Maven Wrapper
+      # Разрешаем запуск Maven Wrapper
       - name: Make Maven Wrapper executable
         run: chmod +x ./mvnw
 
-      # 4. Собираем проект
+      # Собираем приложение
       - name: Build project
         run: ./mvnw --batch-mode --no-transfer-progress clean package
 
-      # 5. Запускаем проверку сохранения данных
+      # Проверяем сохранение данных
       - name: Run persistence smoke test
         run: >
           ./mvnw --batch-mode --no-transfer-progress
@@ -44,11 +49,71 @@ jobs:
           -Dexec.classpathScope=test
           org.codehaus.mojo:exec-maven-plugin:3.7.0:java
 
-      # 6. Сохраняем собранный JAR как артефакт
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v6
+      # Формируем дистрибутив
+      - name: Prepare application distribution
+        run: |
+          mkdir -p dist/link-shortener
+
+          cp target/homework-final-1.0-SNAPSHOT.jar \
+             dist/link-shortener/link-shortener.jar
+
+          cp config.properties dist/link-shortener/
+          cp README.md dist/link-shortener/
+
+          cat > dist/link-shortener/run-windows.bat <<'EOF'
+          @echo off
+          cd /d "%~dp0"
+          java -jar link-shortener.jar
+          pause
+          EOF
+
+          cat > dist/link-shortener/run-linux.sh <<'EOF'
+          #!/usr/bin/env bash
+          cd "$(dirname "$0")"
+          java -jar link-shortener.jar
+          EOF
+
+          chmod +x dist/link-shortener/run-linux.sh
+
+          cd dist
+          zip -r ../target/link-shortener.zip link-shortener
+
+      # Сохраняем готовый дистрибутив
+      - name: Upload application distribution
+        uses: actions/upload-artifact@v7
         with:
-          name: link-shortener-jar
-          path: target/*.jar
+          name: link-shortener-distribution
+          path: target/link-shortener.zip
           if-no-files-found: error
           retention-days: 14
+
+  # Публикация Release выполняется только при отправке тега v*
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-and-test
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      # Получаем готовый ZIP из предыдущей задачи
+      - name: Download application distribution
+        uses: actions/download-artifact@v8
+        with:
+          name: link-shortener-distribution
+          path: dist
+
+      # Создаём GitHub Release и прикрепляем ZIP
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dist/link-shortener.zip \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Link Shortener $GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag
